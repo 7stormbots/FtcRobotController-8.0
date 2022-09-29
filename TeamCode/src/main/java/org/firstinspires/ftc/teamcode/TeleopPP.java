@@ -32,8 +32,6 @@ public class TeleopPP extends LinearOpMode {
 
     }
 
-    //hope this works
-
     @Override
     public void runOpMode() {
 
