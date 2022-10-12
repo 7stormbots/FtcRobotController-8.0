@@ -1,19 +1,25 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.hardware.rev.RevBlinkinLedDriver;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.PIDFCoefficients;
 import com.qualcomm.robotcore.hardware.Servo;
+import com.qualcomm.robotcore.hardware.DigitalChannel;
+import com.qualcomm.robotcore.hardware.ColorSensor;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import com.qualcomm.robotcore.hardware.DistanceSensor;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 import org.checkerframework.checker.units.qual.Current;
 
-@TeleOp(name = "MainTeleop", group = "")
+@TeleOp(name = "MainTeleopPP", group = "")
 
 public class TeleopPP extends LinearOpMode {
 
-    private DcMotor leftFront, rightFront, leftRear, rightRear;
+    private DcMotorEx leftFront, rightFront, leftRear, rightRear;
     private double FilteredXR, LastFilteredXR, FilteredXL, LastFilteredXL, FilteredYL, LastFilteredYL;
     private Servo claw;
     public static final double NEW_P = 20;
@@ -25,6 +31,21 @@ public class TeleopPP extends LinearOpMode {
     public boolean slowmode = true;
     boolean gamepad1aispressed;
     private State CurrentState;
+    private RevBlinkinLedDriver blinkin;
+    private DigitalChannel RedLED2;
+    private DigitalChannel GreenLED2;
+    private DigitalChannel RedLED;
+    private DigitalChannel GreenLED;
+    private ColorSensor sensorColorRange_REV_ColorRangeSensor;
+    private int level = 0;
+    private boolean palm;
+    private ElapsedTime TimerB;
+    private double grabberClose = 0.3;
+    private double grabberOpen = 0.5;
+    private boolean lifterHome = false;
+
+
+
 
     private enum State {
         DEFAULT,
@@ -35,12 +56,23 @@ public class TeleopPP extends LinearOpMode {
     @Override
     public void runOpMode() {
 
+        TimerB = new ElapsedTime();
+
+        palm = false;
+
         CurrentState = State.DEFAULT;
+
+        PIDFCoefficients pidNew = new PIDFCoefficients(NEW_P, NEW_I, NEW_D, NEW_F);
+
+        LastFilteredXL = 0;
+        LastFilteredXR = 0;
+        LastFilteredYL = 0;
 
         leftFront = hardwareMap.get(DcMotorEx.class, "leftFront");
         leftRear = hardwareMap.get(DcMotorEx.class, "leftRear");
         rightRear = hardwareMap.get(DcMotorEx.class, "rightRear");
         rightFront = hardwareMap.get(DcMotorEx.class, "rightFront");
+
 
         claw = hardwareMap.get(Servo.class, "claw");
 
@@ -59,11 +91,22 @@ public class TeleopPP extends LinearOpMode {
         leftRear.setDirection(DcMotorEx.Direction.FORWARD);
         rightRear.setDirection(DcMotorEx.Direction.FORWARD);
 
-        PIDFCoefficients pidNew = new PIDFCoefficients(NEW_P, NEW_I, NEW_D, NEW_F);
+        blinkin = hardwareMap.get(RevBlinkinLedDriver.class, "blinkin");
 
-        LastFilteredXL = 0;
-        LastFilteredXR = 0;
-        LastFilteredYL = 0;
+        sensorColorRange_REV_ColorRangeSensor = hardwareMap.get(ColorSensor.class, "sensorColorRange");
+
+        GreenLED = hardwareMap.get(DigitalChannel.class, "green");
+        RedLED = hardwareMap.get(DigitalChannel.class, "red");
+        GreenLED2 = hardwareMap.get(DigitalChannel.class, "green2");
+        RedLED2 = hardwareMap.get(DigitalChannel.class, "red2");
+        RedLED.setMode(DigitalChannel.Mode.OUTPUT);
+        GreenLED.setMode(DigitalChannel.Mode.OUTPUT);
+        RedLED2.setMode(DigitalChannel.Mode.OUTPUT);
+        GreenLED2.setMode(DigitalChannel.Mode.OUTPUT);
+        GreenLED.setState(false);
+        GreenLED2.setState(false);
+        RedLED.setState(false);
+        RedLED2.setState(false);
 
         waitForStart();
 
@@ -105,17 +148,17 @@ public class TeleopPP extends LinearOpMode {
 
             }
 
-            //awesomeState();
+            andrewState();
 
         }
 
     }
 
-    private void leapFrog(){
+    /*private void leapFrog(){
         if (gamepad2.dpad_up) {
 
         }
-    }
+    }*/
 
     private void SmoothingFunction(){
         if (gamepad2.x && !gamepad2xIsPressed){
@@ -167,28 +210,84 @@ public class TeleopPP extends LinearOpMode {
         LastFilteredXR = FilteredXR;
     }
 
-    private void MoveUp() {
 
-    }
-
-    /*private void andrewState() {
+    private void andrewState() {
         switch (CurrentState) {
             case DEFAULT:
-                if (claw.getPosition() == 0) {
-                    //have claw open, lifter at home position, led strip in green
+                if (!palm) {
+
+                    blinkin.setPattern(RevBlinkinLedDriver.BlinkinPattern.RED);
+
+                    claw.setPosition(grabberOpen);
+
+                    telemetry.addData("distance", ((DistanceSensor) sensorColorRange_REV_ColorRangeSensor).getDistance(DistanceUnit.CM));
+                    telemetry.addData("timer", TimerB);
+                    telemetry.update();
+
+                    if ((((DistanceSensor) sensorColorRange_REV_ColorRangeSensor).getDistance(DistanceUnit.CM) > 6)) {
+                        TimerB.reset();
+
+                        telemetry.addData("cone?!?!?!?!?!??!?!?!??!", "None");
+                    }
+
+                    if (TimerB.milliseconds() >= 500) {
+                        palm = true;
+                        lifterHome = false;
+                    }
+
+                    if (TimerB.milliseconds() >= 250) {
+                        claw.setPosition(grabberClose);
+                    } else {
+                        claw.setPosition(grabberOpen);
+                    }
+
                 } else {
                     CurrentState = State.DROP;
                 }
             case DROP:
-                if () {
-                    //have something similar to last years, where we had the bumpers determine the side it would drop (no sides u drop in the same spot
-                    //BUT have it so the dPad? will determine the level, so dpadUp could be high, dpadRight would be middle, and dpadDown would be low
-                    //^^dpad down can lower the arm one level and dpad up can raise it one with a max of 3, and if you hit dpad down enough it returns it to home
+                if (palm) {
+
+                    blinkin.setPattern(RevBlinkinLedDriver.BlinkinPattern.GREEN);
+
+                    /*if (gamepad2.dpad_up) {
+                        level = level + 1;
+                    } else if (gamepad2.dpad_down) {
+                        level = level - 1;
+                    }
+
+                    if (level == 0) {
+                        lifter.setPosition(groundLevel);
+                    } else if (level == 1) {
+                        lifter.setPosition(low);
+                    } else if (level == 2) {
+                        lifter.setPosition(mid);
+                    } else if (level == 3) {
+                        lifter.setPosition(high);
+                    }*/
+
+                    if ((((DistanceSensor) sensorColorRange_REV_ColorRangeSensor).getDistance(DistanceUnit.CM) < 6)) {
+                        TimerB.reset();
+
+                        telemetry.addData("Palm?", "None");
+                    }
+                    if (TimerB.milliseconds() >= 500) {
+                        palm = false;
+
+                    }
+                    if (TimerB.milliseconds() >= 250) {
+                        palm = false;
+                    }
+
+                    if (gamepad2.b) {
+                        claw.setPosition(grabberOpen);
+                    }
+
+
                 } else {
                     CurrentState = State.DEFAULT;
                 }
         }
-    }*/
+    }
 
 
 }
